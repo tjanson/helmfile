@@ -105,8 +105,16 @@ func Parse(goGetterSrc string) (*Source, error) {
 	}
 
 	pathComponents := strings.Split(u.Path, "@")
-	if len(pathComponents) != 2 {
-		return nil, fmt.Errorf("invalid src format: it must be `[<getter>::]<scheme>://<host>/<path/to/dir>@<path/to/file>?key1=val1&key2=val2: got %s", goGetterSrc)
+	var sourceDir, sourceFile string
+
+	switch len(pathComponents) {
+	case 1:
+		sourceDir = pathComponents[0]
+	case 2:
+		sourceDir = pathComponents[0]
+		sourceFile = pathComponents[1]
+	default:
+		return nil, fmt.Errorf("invalid src format: it must be `[<getter>::]<scheme>://<host>/<path/to/dir>[@<path/to/file>]?key1=val1&key2=val2: got %s", goGetterSrc)
 	}
 
 	return &Source{
@@ -114,8 +122,8 @@ func Parse(goGetterSrc string) (*Source, error) {
 		User:     u.User.String(),
 		Scheme:   u.Scheme,
 		Host:     u.Host,
-		Dir:      pathComponents[0],
-		File:     pathComponents[1],
+		Dir:      sourceDir,
+		File:     sourceFile,
 		RawQuery: u.RawQuery,
 	}, nil
 }
@@ -134,7 +142,7 @@ func (r *Remote) Fetch(goGetterSrc string, cacheDirOpt ...string) (string, error
 	r.Logger.Debugf("remote> user: %s", u.User)
 	r.Logger.Debugf("remote> host: %s", u.Host)
 	r.Logger.Debugf("remote> dir: %s", u.Dir)
-	r.Logger.Debugf("remote> file: %s", u.File)
+	r.Logger.Debugf("remote> file: %s", file)
 
 	// This should be shared across variant commands, so that they can share cache for the shared imports
 	cacheBaseDir := ""
@@ -168,18 +176,20 @@ func (r *Remote) Fetch(goGetterSrc string, cacheDirOpt ...string) (string, error
 	// e.g. os.CacheDir()/helmfile/https_github_com_cloudposse_helmfiles_git.ref=0.xx.0
 	cacheDirPath := filepath.Join(r.Home, getterDst)
 
+	// origin is for judging whether target is file or directory
+	// e.g. os.CacheDir()/helmfile/https_github_com_cloudposse_helmfiles_git.ref=0.xx.0/origin
+	originDirOrFilePath := filepath.Join(cacheDirPath, "origin")
+
 	r.Logger.Debugf("remote> home: %s", r.Home)
 	r.Logger.Debugf("remote> getter dest: %s", getterDst)
 	r.Logger.Debugf("remote> cached dir: %s", cacheDirPath)
 
-	{
-		if r.fs.FileExistsAt(cacheDirPath) {
-			return "", fmt.Errorf("%s is not directory. please remove it so that variant could use it for dependency caching", getterDst)
-		}
+	if r.fs.FileExistsAt(cacheDirPath) {
+		return "", fmt.Errorf("%s is not directory. please remove it so that variant could use it for dependency caching", getterDst)
+	}
 
-		if r.fs.DirectoryExistsAt(cacheDirPath) {
-			cached = true
-		}
+	if r.fs.DirectoryExistsAt(cacheDirPath) && (r.fs.FileExistsAt(originDirOrFilePath) || r.fs.DirectoryExistsAt(originDirOrFilePath)) {
+		cached = true
 	}
 
 	if !cached {
@@ -198,18 +208,20 @@ func (r *Remote) Fetch(goGetterSrc string, cacheDirOpt ...string) (string, error
 			getterSrc = u.Getter + "::" + getterSrc
 		}
 
-		r.Logger.Debugf("remote> downloading %s to %s", getterSrc, getterDst)
+		r.Logger.Debugf("remote> downloading %s to %s", getterSrc, originDirOrFilePath)
 
-		if err := r.Getter.Get(r.Home, getterSrc, cacheDirPath); err != nil {
-			rmerr := os.RemoveAll(cacheDirPath)
+		if err := r.Getter.Get(r.Home, getterSrc, originDirOrFilePath); err != nil {
+			rmerr := os.RemoveAll(originDirOrFilePath)
 			if rmerr != nil {
 				return "", multierr.Append(err, rmerr)
 			}
 			return "", err
 		}
 	}
-
-	return filepath.Join(cacheDirPath, file), nil
+	if file == "" {
+		return originDirOrFilePath, nil
+	}
+	return filepath.Join(originDirOrFilePath, file), nil
 }
 
 type Getter interface {
@@ -223,13 +235,15 @@ type GoGetter struct {
 func (g *GoGetter) Get(wd, src, dst string) error {
 	ctx := context.Background()
 
+	opts := []getter.ClientOption{}
+
 	get := &getter.Client{
 		Ctx:     ctx,
 		Src:     src,
 		Dst:     dst,
 		Pwd:     wd,
-		Mode:    getter.ClientModeDir,
-		Options: []getter.ClientOption{},
+		Mode:    getter.ClientModeAny,
+		Options: opts,
 	}
 
 	g.Logger.Debugf("client: %+v", *get)
