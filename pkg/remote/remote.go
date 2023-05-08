@@ -218,9 +218,6 @@ func (r *Remote) Fetch(goGetterSrc string, cacheDirOpt ...string) (string, error
 			return "", err
 		}
 	}
-	if file == "" {
-		return originDirOrFilePath, nil
-	}
 	return filepath.Join(originDirOrFilePath, file), nil
 }
 
