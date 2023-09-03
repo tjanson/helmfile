@@ -283,5 +283,6 @@ func (ld *desiredStateLoader) load(env, overrodeEnv *environment.Environment, ba
 		}
 	}
 
+	finalState.OrginReleases = finalState.Releases
 	return finalState, nil
 }
