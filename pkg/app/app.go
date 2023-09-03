@@ -660,11 +660,10 @@ func (a *App) list(run *Run) ([]*HelmRelease, error) {
 			return nil, err
 		}
 
-		installed := r.Installed == nil || *r.Installed
 		releases = append(releases, &HelmRelease{
 			Name:      r.Name,
 			Namespace: r.Namespace,
-			Installed: installed,
+			Installed: r.Desired(),
 			Enabled:   enabled,
 			Labels:    labels,
 			Chart:     r.Chart,
@@ -1085,7 +1084,11 @@ func (a *App) visitStatesWithSelectorsAndRemoteSupport(fileOrDir string, converg
 
 	// pre-overrides HelmState
 	fHelmStatsWithOverrides := func(st *state.HelmState) (bool, []error) {
-		st.Releases = st.GetReleasesWithOverrides()
+		var err error
+		st.Releases, err = st.GetReleasesWithOverrides()
+		if err != nil {
+			return false, []error{err}
+		}
 		return f(st)
 	}
 
@@ -1113,7 +1116,7 @@ func processFilteredReleases(st *state.HelmState, converge func(st *state.HelmSt
 
 func checkDuplicates(releases []state.ReleaseSpec) error {
 	type Key struct {
-		TillerNamespace, Name, KubeContext string
+		Namespace, Name, KubeContext string
 	}
 
 	releaseNameCounts := map[Key]int{}
@@ -1125,8 +1128,8 @@ func checkDuplicates(releases []state.ReleaseSpec) error {
 		if c > 1 {
 			var msg string
 
-			if name.TillerNamespace != "" {
-				msg += fmt.Sprintf(" in namespace %q", name.TillerNamespace)
+			if name.Namespace != "" {
+				msg += fmt.Sprintf(" in namespace %q", name.Namespace)
 			}
 
 			if name.KubeContext != "" {
@@ -1680,10 +1683,9 @@ func (a *App) status(r *Run, c StatusesConfigProvider) (bool, []error) {
 
 	var toStatus []state.ReleaseSpec
 	for _, r := range selectedReleases {
-		if r.Installed != nil && !*r.Installed {
-			continue
+		if r.Desired() {
+			toStatus = append(toStatus, r)
 		}
-		toStatus = append(toStatus, r)
 	}
 
 	var errs []error
@@ -1763,7 +1765,7 @@ func (a *App) sync(r *Run, c SyncConfigProvider) (bool, []error) {
 	for _, r := range toSyncWithNeeds {
 		release := r
 		if _, deleted := releasesToDelete[state.ReleaseToID(&release)]; !deleted {
-			if release.Installed == nil || *release.Installed {
+			if r.Desired() {
 				toUpdate = append(toUpdate, release)
 			}
 			// TODO Emit error when the user opted to fail when the needed release is disabled,
@@ -1954,7 +1956,7 @@ func (a *App) withNeeds(r *Run, c DAGConfig, includeDisabled bool, f func(*state
 	for _, r := range selectedReleasesWithNeeds {
 		release := r
 		id := state.ReleaseToID(&release)
-		if release.Installed != nil && !*release.Installed {
+		if !release.Desired() {
 			releasesToUninstall[id] = release
 		} else {
 			toRender = append(toRender, release)
@@ -2039,10 +2041,9 @@ func (a *App) writeValues(r *Run, c WriteValuesConfigProvider) (bool, []error) {
 	for _, r := range toRender {
 		release := r
 		id := state.ReleaseToID(&release)
-		if release.Installed != nil && !*release.Installed {
-			continue
+		if release.Desired() {
+			releasesToWrite[id] = release
 		}
-		releasesToWrite[id] = release
 	}
 
 	var errs []error

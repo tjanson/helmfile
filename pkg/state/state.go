@@ -277,7 +277,7 @@ type ReleaseSpec struct {
 	// MissingFileHandler is set to either "Error" or "Warn". "Error" instructs helmfile to fail when unable to find a values or secrets file. When "Warn", it prints the file and continues.
 	// The default value for MissingFileHandler is "Error".
 	MissingFileHandler *string `yaml:"missingFileHandler,omitempty"`
-	// Needs is the [TILLER_NS/][NS/]NAME representations of releases that this release depends on.
+	// Needs is the [KUBECONTEXT/][NS/]NAME representations of releases that this release depends on.
 	Needs []string `yaml:"needs,omitempty"`
 
 	// Hooks is a list of extension points paired with operations, that are executed in specific points of the lifecycle of releases defined in helmfile
@@ -434,15 +434,12 @@ var DefaultFetchOutputDirTemplate = filepath.Join(
 	"{{ or .Release.Version \"latest\" }}",
 )
 
-func (st *HelmState) ApplyOverrides(spec *ReleaseSpec) {
-	if st.OverrideKubeContext != "" {
-		spec.KubeContext = st.OverrideKubeContext
-	}
-	if st.OverrideNamespace != "" {
-		spec.Namespace = st.OverrideNamespace
-	}
-
+func (st *HelmState) ReFormatNeeds(spec *ReleaseSpec) ([]string, error) {
 	var needs []string
+	releaseInstalledInfo := make(map[string]bool)
+	for _, r := range st.Releases {
+		releaseInstalledInfo[r.Name] = r.Desired()
+	}
 
 	// Since the representation differs between needs and id,
 	// correct it by prepending Namespace and KubeContext.
@@ -454,6 +451,9 @@ func (st *HelmState) ApplyOverrides(spec *ReleaseSpec) {
 		components := strings.Split(n, "/")
 
 		name = components[len(components)-1]
+		if !releaseInstalledInfo[name] {
+			return nil, fmt.Errorf("release %s needs %s, but it is not installed", spec.Name, name)
+		}
 
 		if len(components) > 1 {
 			ns = components[len(components)-2]
@@ -488,8 +488,23 @@ func (st *HelmState) ApplyOverrides(spec *ReleaseSpec) {
 
 		needs = append(needs, strings.Join(componentsAfterOverride, "/"))
 	}
+	return needs, nil
+}
 
+func (st *HelmState) ApplyOverrides(spec *ReleaseSpec) error {
+	if st.OverrideKubeContext != "" {
+		spec.KubeContext = st.OverrideKubeContext
+	}
+	if st.OverrideNamespace != "" {
+		spec.Namespace = st.OverrideNamespace
+	}
+
+	needs, err := st.ReFormatNeeds(spec)
+	if err != nil {
+		return err
+	}
 	spec.Needs = needs
+	return nil
 }
 
 type RepoUpdater interface {
@@ -586,7 +601,11 @@ func (st *HelmState) prepareSyncReleases(helm helmexec.Interface, additionalValu
 		},
 		func(workerIndex int) {
 			for release := range jobs {
-				st.ApplyOverrides(release)
+				errs := []*ReleaseError{}
+				applyOverridesErr := st.ApplyOverrides(release)
+				if applyOverridesErr != nil {
+					errs = append(errs, newReleaseFailedError(release, applyOverridesErr))
+				}
 
 				// If `installed: false`, the only potential operation on this release would be uninstalling.
 				// We skip generating values files in that case, because for an uninstall with `helm delete`, we don't need to those.
@@ -609,7 +628,6 @@ func (st *HelmState) prepareSyncReleases(helm helmexec.Interface, additionalValu
 					continue
 				}
 
-				errs := []*ReleaseError{}
 				for _, value := range additionalValues {
 					valfile, err := filepath.Abs(value)
 					if err != nil {
@@ -1019,10 +1037,9 @@ func releasesNeedCharts(releases []ReleaseSpec) []ReleaseSpec {
 	var result []ReleaseSpec
 
 	for _, r := range releases {
-		if r.Installed != nil && !*r.Installed {
-			continue
+		if r.Desired() {
+			result = append(result, r)
 		}
-		result = append(result, r)
 	}
 
 	return result
@@ -1423,7 +1440,10 @@ func (st *HelmState) TemplateReleases(helm helmexec.Interface, outputDir string,
 			continue
 		}
 
-		st.ApplyOverrides(release)
+		err := st.ApplyOverrides(release)
+		if err != nil {
+			errs = append(errs, err)
+		}
 
 		flags, files, err := st.flagsForTemplate(helm, release, 0, opts)
 
@@ -1523,7 +1543,10 @@ func (st *HelmState) WriteReleasesValues(helm helmexec.Interface, additionalValu
 			continue
 		}
 
-		st.ApplyOverrides(release)
+		err := st.ApplyOverrides(release)
+		if err != nil {
+			return []error{err}
+		}
 
 		generatedFiles, err := st.generateValuesFiles(helm, release, i)
 		if err != nil {
@@ -1808,7 +1831,11 @@ func (st *HelmState) prepareDiffReleases(helm helmexec.Interface, additionalValu
 			for release := range jobs {
 				errs := []error{}
 
-				st.ApplyOverrides(release)
+				err := st.ApplyOverrides(release)
+
+				if err != nil {
+					errs = append(errs, err)
+				}
 
 				suppressDiff := false
 				if release.SuppressDiff != nil && *release.SuppressDiff {
@@ -2039,7 +2066,10 @@ func (st *HelmState) ReleaseStatuses(helm helmexec.Interface, workerLimit int) [
 			return nil
 		}
 
-		st.ApplyOverrides(&release)
+		err := st.ApplyOverrides(&release)
+		if err != nil {
+			return err
+		}
 
 		flags := []string{}
 		if release.Namespace != "" {
@@ -2054,7 +2084,11 @@ func (st *HelmState) ReleaseStatuses(helm helmexec.Interface, workerLimit int) [
 // DeleteReleases wrapper for executing helm delete on the releases
 func (st *HelmState) DeleteReleases(affectedReleases *AffectedReleases, helm helmexec.Interface, concurrency int, purge bool, cascade string) []error {
 	return st.scatterGatherReleases(helm, concurrency, func(release ReleaseSpec, workerIndex int) error {
-		st.ApplyOverrides(&release)
+		err := st.ApplyOverrides(&release)
+		if err != nil {
+			affectedReleases.Failed = append(affectedReleases.Failed, &release)
+			return err
+		}
 
 		flags := make([]string, 0)
 		flags = st.appendConnectionFlags(flags, &release)
@@ -2141,14 +2175,17 @@ func (st *HelmState) Clean() []error {
 	return nil
 }
 
-func (st *HelmState) GetReleasesWithOverrides() []ReleaseSpec {
+func (st *HelmState) GetReleasesWithOverrides() ([]ReleaseSpec, error) {
 	var rs []ReleaseSpec
 	for _, r := range st.Releases {
 		spec := r
-		st.ApplyOverrides(&spec)
+		err := st.ApplyOverrides(&spec)
+		if err != nil {
+			return nil, err
+		}
 		rs = append(rs, spec)
 	}
-	return rs
+	return rs, nil
 }
 
 func (st *HelmState) SelectReleases(includeTransitiveNeeds bool) ([]Release, error) {
