@@ -810,6 +810,7 @@ second-pass rendering result of "helmfile.yaml.part.0":
 24: 
 
 merged environment: &{default  map[] map[]}
+WARNING: release external-secrets needs kubernetes-external-secrets, but kubernetes-external-secrets is not installed
 2 release(s) matching app=test found in helmfile.yaml
 
 Affected releases are:
@@ -828,6 +829,7 @@ GROUP RELEASES
 2     default/default/my-release
 
 processing releases in group 1/2: default/default/external-secrets
+WARNING: release external-secrets needs kubernetes-external-secrets, but kubernetes-external-secrets is not installed
 processing releases in group 2/2: default/default/my-release
 
 UPDATED RELEASES:
@@ -958,6 +960,7 @@ second-pass rendering result of "helmfile.yaml.part.0":
 24: 
 
 merged environment: &{default  map[] map[]}
+WARNING: release external-secrets needs kubernetes-external-secrets, but kubernetes-external-secrets is not installed
 2 release(s) matching app=test found in helmfile.yaml
 
 Affected releases are:
@@ -970,6 +973,7 @@ GROUP RELEASES
 2     default/default/my-release
 
 processing releases in group 1/2: default/default/external-secrets
+WARNING: release external-secrets needs kubernetes-external-secrets, but kubernetes-external-secrets is not installed
 processing releases in group 2/2: default/default/my-release
 
 UPDATED RELEASES:
