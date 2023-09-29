@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
+	"strings"
 
 	"github.com/helmfile/chartify"
 
@@ -22,6 +24,41 @@ func (st *HelmState) appendHelmXFlags(flags []string, release *ReleaseSpec) []st
 		flags = append(flags, "--adopt", adopt)
 	}
 
+	return flags
+}
+
+func formatLabels(labels map[string]string) string {
+	var labelsList, keys []string
+	for k := range labels {
+		if k == "" {
+			continue
+		}
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	if len(keys) == 0 {
+		return ""
+	}
+
+	for _, k := range keys {
+		val := labels[k]
+		if val == "" {
+			val = "null"
+		}
+		labelsList = append(labelsList, fmt.Sprintf("%s=%s", k, val))
+	}
+	return strings.Join(labelsList, ",")
+}
+
+// append labels flags to helm flags, starting from helm v3.13.0
+func (st *HelmState) appendLabelsFlags(flags []string, helm helmexec.Interface, release *ReleaseSpec) []string {
+	if helm.IsVersionAtLeast("3.13.0") {
+		labels := formatLabels(release.Labels)
+		if labels != "" {
+			flags = append(flags, "--label", labels)
+		}
+	}
 	return flags
 }
 

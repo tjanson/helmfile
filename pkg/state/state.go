@@ -2154,16 +2154,37 @@ func (st *HelmState) GetReleasesWithOverrides() []ReleaseSpec {
 	return rs
 }
 
+func (st *HelmState) GetReleasesWithLabels() []ReleaseSpec {
+	var rs []ReleaseSpec
+	for _, r := range st.Releases {
+		spec := r
+		labels := map[string]string{}
+		// apply common labels
+		for k, v := range st.CommonLabels {
+			labels[k] = v
+		}
+		// Let the release name, namespace, and chart be used as a tag
+		labels["name"] = spec.Name
+		labels["namespace"] = spec.Namespace
+		// Strip off just the last portion for the name stable/newrelic would give newrelic
+		chartSplit := strings.Split(spec.Chart, "/")
+		labels["chart"] = chartSplit[len(chartSplit)-1]
+		spec.Labels = labels
+		rs = append(rs, spec)
+	}
+	return rs
+}
+
 func (st *HelmState) SelectReleases(includeTransitiveNeeds bool) ([]Release, error) {
 	values := st.Values()
-	rs, err := markExcludedReleases(st.Releases, st.Selectors, st.CommonLabels, values, includeTransitiveNeeds)
+	rs, err := markExcludedReleases(st.Releases, st.Selectors, values, includeTransitiveNeeds)
 	if err != nil {
 		return nil, err
 	}
 	return rs, nil
 }
 
-func markExcludedReleases(releases []ReleaseSpec, selectors []string, commonLabels map[string]string, values map[string]any, includeTransitiveNeeds bool) ([]Release, error) {
+func markExcludedReleases(releases []ReleaseSpec, selectors []string, values map[string]any, includeTransitiveNeeds bool) ([]Release, error) {
 	var filteredReleases []Release
 	filters := []ReleaseFilter{}
 	for _, label := range selectors {
@@ -2174,24 +2195,8 @@ func markExcludedReleases(releases []ReleaseSpec, selectors []string, commonLabe
 		filters = append(filters, f)
 	}
 	for _, r := range releases {
-		if r.Labels == nil {
-			r.Labels = map[string]string{}
-		}
-		// Let the release name, namespace, and chart be used as a tag
-		r.Labels["name"] = r.Name
-		r.Labels["namespace"] = r.Namespace
-		// Strip off just the last portion for the name stable/newrelic would give newrelic
-		chartSplit := strings.Split(r.Chart, "/")
-		r.Labels["chart"] = chartSplit[len(chartSplit)-1]
-		// Merge CommonLabels into release labels
-		for k, v := range commonLabels {
-			r.Labels[k] = v
-		}
 		var filterMatch bool
 		for _, f := range filters {
-			if r.Labels == nil {
-				r.Labels = map[string]string{}
-			}
 			if f.Match(r) {
 				filterMatch = true
 				break
@@ -2562,6 +2567,8 @@ func (st *HelmState) flagsForUpgrade(helm helmexec.Interface, release *ReleaseSp
 	flags = st.appendChartDownloadTLSFlags(flags, release)
 
 	flags = st.appendHelmXFlags(flags, release)
+
+	flags = st.appendLabelsFlags(flags, helm, release)
 
 	postRenderer := ""
 	if opt != nil {
