@@ -2163,6 +2163,9 @@ func (st *HelmState) GetReleasesWithLabels() []ReleaseSpec {
 		for k, v := range st.CommonLabels {
 			labels[k] = v
 		}
+		for k, v := range spec.Labels {
+			labels[k] = v
+		}
 		// Let the release name, namespace, and chart be used as a tag
 		labels["name"] = spec.Name
 		labels["namespace"] = spec.Namespace
