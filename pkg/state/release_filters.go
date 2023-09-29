@@ -9,7 +9,7 @@ import (
 // ReleaseFilter is used to determine if a given release should be used during helmfile execution
 type ReleaseFilter interface {
 	// Match returns true if the ReleaseSpec matches the Filter
-	Match(labels map[string]string) bool
+	Match(r ReleaseSpec) bool
 }
 
 // LabelFilter matches a release with the given positive lables. Negative labels
@@ -20,12 +20,12 @@ type LabelFilter struct {
 }
 
 // Match will match a release that has the same labels as the filter
-func (l LabelFilter) Match(labels map[string]string) bool {
+func (l LabelFilter) Match(r ReleaseSpec) bool {
 	if len(l.positiveLabels) > 0 {
 		for _, element := range l.positiveLabels {
 			k := element[0]
 			v := element[1]
-			if rVal, ok := labels[k]; !ok {
+			if rVal, ok := r.Labels[k]; !ok {
 				return false
 			} else if rVal != v {
 				return false
@@ -37,7 +37,7 @@ func (l LabelFilter) Match(labels map[string]string) bool {
 		for _, element := range l.negativeLabels {
 			k := element[0]
 			v := element[1]
-			if rVal, ok := labels[k]; !ok {
+			if rVal, ok := r.Labels[k]; !ok {
 
 			} else if rVal == v {
 				return false
