@@ -351,7 +351,7 @@ func TestReadFromYaml_FilterReleasesOnLabels(t *testing.T) {
 	}
 	for idx, c := range cases {
 		for idx2, expected := range c.results {
-			if f := c.filter.Match(state.Releases[idx2]); f != expected {
+			if f := c.filter.Match(state.Releases[idx2].Labels); f != expected {
 				t.Errorf("[case: %d][outcome: %d] Unexpected outcome wanted %t, got %t", idx, idx2, expected, f)
 			}
 		}
@@ -392,7 +392,7 @@ func TestReadFromYaml_FilterNegatives(t *testing.T) {
 	}
 	for idx, c := range cases {
 		for idx2, expected := range c.results {
-			if f := c.filter.Match(state.Releases[idx2]); f != expected {
+			if f := c.filter.Match(state.Releases[idx2].Labels); f != expected {
 				t.Errorf("[case: %d][outcome: %d] Unexpected outcome wanted %t, got %t", idx, idx2, expected, f)
 			}
 		}
