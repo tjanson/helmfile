@@ -2193,7 +2193,12 @@ func markExcludedReleases(releases []ReleaseSpec, selectors []string, values map
 	}
 	for _, r := range releases {
 		var filterMatch bool
+
 		labels := r.Labels
+		if labels == nil {
+			labels = map[string]string{}
+		}
+
 		// Let the release name, namespace, and chart be used as a tag
 		labels["name"] = r.Name
 		labels["namespace"] = r.Namespace
