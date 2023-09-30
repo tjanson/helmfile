@@ -284,7 +284,7 @@ releases:
 	})
 	assert.NoError(t, err)
 
-	expected := `[{"name":"myrelease1","namespace":"testNamespace","enabled":true,"installed":false,"labels":"id:myrelease1","chart":"mychart1","version":""},{"name":"myrelease2","namespace":"testNamespace","enabled":false,"installed":true,"labels":"","chart":"mychart1","version":""},{"name":"myrelease3","namespace":"testNamespace","enabled":true,"installed":true,"labels":"","chart":"mychart1","version":""},{"name":"myrelease4","namespace":"testNamespace","enabled":true,"installed":true,"labels":"id:myrelease1","chart":"mychart1","version":""}]
+	expected := `[{"name":"myrelease1","namespace":"testNamespace","enabled":true,"installed":false,"labels":"chart:mychart1,id:myrelease1,name:myrelease1,namespace:testNamespace","chart":"mychart1","version":""},{"name":"myrelease2","namespace":"testNamespace","enabled":false,"installed":true,"labels":"chart:mychart1,name:myrelease2,namespace:testNamespace","chart":"mychart1","version":""},{"name":"myrelease3","namespace":"testNamespace","enabled":true,"installed":true,"labels":"chart:mychart1,name:myrelease3,namespace:testNamespace","chart":"mychart1","version":""},{"name":"myrelease4","namespace":"testNamespace","enabled":true,"installed":true,"labels":"chart:mychart1,id:myrelease1,name:myrelease4,namespace:testNamespace","chart":"mychart1","version":""}]
 `
 	assert.Equal(t, expected, out)
 }
