@@ -4,10 +4,12 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 
 	"github.com/helmfile/chartify"
+	"helm.sh/helm/v3/pkg/storage/driver"
 
 	"github.com/helmfile/helmfile/pkg/helmexec"
 	"github.com/helmfile/helmfile/pkg/remote"
@@ -30,9 +32,10 @@ func (st *HelmState) appendHelmXFlags(flags []string, release *ReleaseSpec) []st
 func formatLabels(labels map[string]string) string {
 	var labelsList, keys []string
 	for k := range labels {
-		if k == "" {
+		if k == "" || slices.Contains(driver.GetSystemLabels(), k) {
 			continue
 		}
+
 		keys = append(keys, k)
 	}
 	sort.Strings(keys)
