@@ -27,7 +27,7 @@ releases:
   namespace: default
   labels:
     chart: util
-    name: default-shared-resources
+    name: default-release-resources
     namespace: default
     service: release-resources
 templates:
