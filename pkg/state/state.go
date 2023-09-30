@@ -718,6 +718,7 @@ type SyncOpts struct {
 	ReuseValues  bool
 	ResetValues  bool
 	PostRenderer string
+	DryRun       string
 }
 
 type SyncOpt interface{ Apply(*SyncOpts) }
@@ -2555,6 +2556,8 @@ func (st *HelmState) flagsForUpgrade(helm helmexec.Interface, release *ReleaseSp
 		postRenderer = opt.PostRenderer
 	}
 	flags = st.appendPostRenderFlags(flags, release, postRenderer)
+
+	flags = st.appendDryRunFlags(flags, opt)
 
 	common, clean, err := st.namespaceAndValuesFlags(helm, release, workerIndex)
 	if err != nil {

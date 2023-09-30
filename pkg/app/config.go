@@ -49,6 +49,7 @@ type ApplyConfigProvider interface {
 	Args() string
 	PostRenderer() string
 	Cascade() string
+	DryRun() string
 
 	Values() []string
 	Set() []string
@@ -94,6 +95,7 @@ type SyncConfigProvider interface {
 	Args() string
 	PostRenderer() string
 	Cascade() string
+	DryRun() string
 
 	Values() []string
 	Set() []string

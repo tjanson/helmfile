@@ -1486,6 +1486,7 @@ Do you really want to apply?
 					ReuseValues:  c.ReuseValues(),
 					ResetValues:  c.ResetValues(),
 					PostRenderer: c.PostRenderer(),
+					DryRun:       c.DryRun(),
 				}
 				return subst.SyncReleases(&affectedReleases, helm, c.Values(), c.Concurrency(), syncOpts)
 			}))
@@ -1878,6 +1879,7 @@ Do you really want to sync?
 					ReuseValues:  c.ReuseValues(),
 					ResetValues:  c.ResetValues(),
 					PostRenderer: c.PostRenderer(),
+					DryRun:       c.DryRun(),
 				}
 				return subst.SyncReleases(&affectedReleases, helm, c.Values(), c.Concurrency(), opts)
 			}))
