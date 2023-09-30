@@ -2166,6 +2166,7 @@ func (st *HelmState) GetReleasesWithLabels() []ReleaseSpec {
 		for k, v := range spec.Labels {
 			labels[k] = v
 		}
+		// Let the release name, namespace, and chart be used as a tag
 		labels["name"] = r.Name
 		labels["namespace"] = r.Namespace
 		// Strip off just the last portion for the name stable/newrelic would give newrelic
@@ -2198,7 +2199,6 @@ func markExcludedReleases(releases []ReleaseSpec, selectors []string, values map
 	}
 	for _, r := range releases {
 		var filterMatch bool
-		// Let the release name, namespace, and chart be used as a tag
 		for _, f := range filters {
 			if f.Match(r) {
 				filterMatch = true
