@@ -59,7 +59,7 @@ func (st *HelmState) appendLabelsFlags(flags []string, helm helmexec.Interface, 
 	if helm.IsVersionAtLeast("3.13.0") {
 		labels := formatLabels(release.Labels)
 		if labels != "" {
-			flags = append(flags, "--label", labels)
+			flags = append(flags, "--labels", labels)
 		}
 	}
 	return flags
