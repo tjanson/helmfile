@@ -111,6 +111,7 @@ func TestSelectReleasesWithOverrides(t *testing.T) {
 		state.Selectors = tc.selector
 
 		state.Releases = state.GetReleasesWithOverrides()
+		state.Releases = state.GetReleasesWithLabels()
 
 		rs, err := state.GetSelectedReleases(false)
 		if err != nil {
